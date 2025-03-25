@@ -1,30 +1,67 @@
 import serial
-import time
+import serial.tools.list_ports
+import tkinter as tk
+from tkinter import ttk, messagebox
 
-# 시리얼 포트 설정
-PORT = "COM3"  # Windows의 경우 "COM3", 리눅스/Mac은 "/dev/ttyUSB0"
-BAUDRATE = 9600  # 전송 속도
+ser = None  # 시리얼 객체
 
-try:
-    ser = serial.Serial(PORT, BAUDRATE, timeout=1)
-    print(f"✅ {PORT}에 연결됨")
+def connect_serial():
+    global ser
+    port = port_combobox.get()
+    baudrate = baudrate_combobox.get()
+    
+    if not port or not baudrate:
+        messagebox.showerror("오류", "포트와 Baudrate를 선택하세요!")
+        return
+    
+    try:
+        ser = serial.Serial(port, int(baudrate), timeout=1)
+        status_label.config(text="연결 상태: 연결됨", fg="green")
+        messagebox.showinfo("연결 성공", f"{port}에 연결되었습니다!")
+    except serial.SerialException as e:
+        messagebox.showerror("연결 실패", str(e))
 
-    while True:
-        # "ping" 메시지 전송
+def send_ping():
+    global ser
+    if ser and ser.is_open:
         ser.write(b'ping\n')
-        print("📤 Sent: ping")
-        
-        # 응답 수신
         response = ser.readline().decode().strip()
+        output_text.insert(tk.END, f"📤 Sent: ping\n")
         if response:
-            print(f"📥 Received: {response}")
+            output_text.insert(tk.END, f"📥 Received: {response}\n")
+    else:
+        messagebox.showerror("오류", "먼저 시리얼 연결을 해주세요!")
 
-        time.sleep(1)  # 1초 대기
+# GUI 생성
+root = tk.Tk()
+root.title("시리얼 통신 테스트")
+root.geometry("400x300")
 
-except serial.SerialException as e:
-    print(f"❌ 시리얼 포트 오류: {e}")
+# 포트 선택 드롭다운
+ttk.Label(root, text="포트 선택:").pack(pady=5)
+ports = [port.device for port in serial.tools.list_ports.comports()]
+port_combobox = ttk.Combobox(root, values=ports)
+port_combobox.pack()
 
-finally:
-    if 'ser' in locals() and ser.is_open:
-        ser.close()
-        print("🔌 연결 종료")
+# 전송 속도 선택
+ttk.Label(root, text="Baudrate:").pack(pady=5)
+baudrate_combobox = ttk.Combobox(root, values=[9600, 115200])
+baudrate_combobox.pack()
+
+# 연결 상태 표시
+status_label = tk.Label(root, text="연결 상태: 해제됨", fg="red")
+status_label.pack(pady=5)
+
+# 버튼 추가
+connect_button = tk.Button(root, text="연결하기", command=connect_serial)
+connect_button.pack(pady=5)
+
+ping_button = tk.Button(root, text="Ping 보내기", command=send_ping)
+ping_button.pack(pady=5)
+
+# 응답 표시창
+output_text = tk.Text(root, height=5, width=50)
+output_text.pack(pady=5)
+
+# GUI 실행
+root.mainloop()
